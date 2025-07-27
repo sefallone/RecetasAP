@@ -114,7 +114,7 @@ else:
     unidades_deseadas = st.number_input(
         "Unidades a producir:",
         min_value=1,
-        value=int(metadata["Cantidad de Cachitos"])
+        value=int(metadata["Cantidad"])
     )
     
     factor = unidades_deseadas / metadata["Cantidad"]
