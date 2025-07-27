@@ -4,104 +4,124 @@ from io import BytesIO
 
 # Configuración de la página
 st.set_page_config(
-    page_title="🧀 Sistema de Recetas - Cachitos",
-    page_icon="🥐",
+    page_title="📚 Libro de Recetas por Hojas",
+    page_icon="🍞",
     layout="wide"
 )
 
 # Título principal
-st.title("🧀 Libro de Recetas - Formulación de Cachitos")
+st.title("📚 Libro de Recetas Industriales")
 
-# --- Cargar datos DESDE TU ARCHIVO ---
-def load_data(uploaded_file):
-    try:
-        df = pd.read_excel(uploaded_file)
-        
-        # Procesamiento especial para tu formato
-        df['Nombre Producto'] = df['Nombre Producto'].ffill()  # Rellena los valores vacíos
-        df = df.dropna(subset=['Materia Prima'])  # Elimina filas vacías
-        
-        # Agrupar por producto
-        grouped = df.groupby('Nombre Producto').agg({
-            'Gramos por cachito': 'first',
-            'Cantidad de Cachitos': 'first',
-            'Materia Prima': list,
-            'GRAMOS': list
-        }).reset_index()
-        
-        return grouped
-    except Exception as e:
-        st.error(f"Error al procesar el archivo: {str(e)}")
-        return None
-
-# --- Interfaz para subir archivo ---
-uploaded_file = st.file_uploader("📤 Sube tu archivo de recetas (Excel)", type=["xlsx"])
+# --- Cargar archivo Excel ---
+uploaded_file = st.file_uploader("Sube tu libro de recetas (Excel)", type=["xlsx"])
 
 if not uploaded_file:
-    st.info("Por favor, sube tu archivo Excel con el formato de recetas")
+    st.info("Por favor, sube tu archivo Excel donde cada hoja es una receta")
     st.stop()
 
-df_recetas = load_data(uploaded_file)
+# --- Obtener nombres de hojas (recetas) ---
+@st.cache_data
+def get_recipe_names(file):
+    try:
+        xls = pd.ExcelFile(file)
+        return xls.sheet_names
+    except Exception as e:
+        st.error(f"Error al leer el archivo: {str(e)}")
+        return []
 
-if df_recetas is None:
-    st.error("El archivo no tiene el formato correcto. Verifica las columnas.")
+recipe_names = get_recipe_names(uploaded_file)
+
+if not recipe_names:
+    st.error("El archivo no contiene hojas válidas")
     st.stop()
 
-# --- Sidebar: Selección de producto ---
-st.sidebar.title("🥐 Productos Disponibles")
-selected_product = st.sidebar.selectbox(
-    "Selecciona un producto:",
-    options=df_recetas["Nombre Producto"]
+# --- Sidebar: Selección de receta ---
+st.sidebar.title("📑 Índice de Recetas")
+selected_recipe = st.sidebar.selectbox(
+    "Selecciona una receta:",
+    options=recipe_names
 )
 
-# --- Obtener datos del producto seleccionado ---
-product_data = df_recetas[df_recetas["Nombre Producto"] == selected_product].iloc[0]
+# --- Cargar la receta seleccionada ---
+@st.cache_data
+def load_recipe(file, sheet_name):
+    try:
+        df = pd.read_excel(file, sheet_name=sheet_name)
+        
+        # Limpieza básica (eliminar filas totalmente vacías)
+        df = df.dropna(how='all')
+        
+        return df
+    except Exception as e:
+        st.error(f"Error al cargar la hoja '{sheet_name}': {str(e)}")
+        return None
 
-# --- Mostrar ficha técnica ---
-st.header(f"📋 Formulación: {selected_product}")
+recipe_df = load_recipe(uploaded_file, selected_recipe)
 
-# Columnas de especificaciones
-col1, col2 = st.columns(2)
-with col1:
-    st.metric("Peso por unidad (g)", product_data["Gramos por cachito"])
-with col2:
-    st.metric("Unidades por lote", product_data["Cantidad de Cachitos"])
+if recipe_df is None:
+    st.stop()
 
-# --- Tabla de formulación ---
-st.subheader("🧾 Ingredientes por Lote")
-df_formulacion = pd.DataFrame({
-    'Materia Prima': product_data["Materia Prima"],
-    'Gramos': product_data["GRAMOS"],
-    '% Composición': [round(g/sum(product_data["GRAMOS"])*100, 2) for g in product_data["GRAMOS"]]
-})
+# --- Mostrar la receta ---
+st.header(f"📋 {selected_recipe}")
 
-# Formatear la tabla
-st.dataframe(
-    df_formulacion.style.format({'% Composición': '{:.2f}%'}),
-    use_container_width=True,
-    hide_index=True
-)
-
-# --- Gráfico de composición ---
-st.subheader("📊 Distribución de Ingredientes")
-st.bar_chart(df_formulacion.set_index('Materia Prima')['% Composición'])
-
-# --- Cálculo de costos (opcional) ---
-if st.checkbox("🧮 Calcular cantidades para producción"):
-    unidades_deseadas = st.number_input(
-        f"Unidades de {selected_product} a producir",
-        min_value=1,
-        value=product_data["Cantidad de Cachitos"]
+# Verificamos si el DataFrame tiene el formato esperado
+if not {'Nombre Producto', 'Gramos por cachito', 'Cantidad de Cachitos', 'Materia Prima', 'GRAMOS'}.issubset(recipe_df.columns):
+    st.warning("""
+    ⚠️ El formato de la hoja no coincide con lo esperado.
+    Asegúrate de que tenga estas columnas:
+    - Nombre Producto
+    - Gramos por cachito
+    - Cantidad de Cachitos
+    - Materia Prima
+    - GRAMOS
+    """)
+    st.write("Vista previa de los datos cargados:")
+    st.dataframe(recipe_df)
+else:
+    # Extraemos metadatos (primera fila válida)
+    metadata = recipe_df.iloc[0]
+    
+    # Columnas de especificaciones
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Peso por unidad (g)", metadata["Gramos por cachito"])
+    with col2:
+        st.metric("Unidades por lote", metadata["Cantidad de Cachitos"])
+    
+    # --- Tabla de ingredientes ---
+    st.subheader("🧾 Formulación")
+    
+    # Filtramos solo las filas con ingredientes (omitimos metadatos si existen)
+    ingredientes_df = recipe_df[['Materia Prima', 'GRAMOS']].dropna()
+    
+    # Calculamos porcentajes
+    total_gramos = ingredientes_df['GRAMOS'].sum()
+    ingredientes_df['% Composición'] = (ingredientes_df['GRAMOS'] / total_gramos) * 100
+    
+    # Mostramos tabla
+    st.dataframe(
+        ingredientes_df.style.format({'% Composición': '{:.2f}%'}),
+        use_container_width=True,
+        hide_index=True
     )
     
-    factor = unidades_deseadas / product_data["Cantidad de Cachitos"]
+    # --- Gráfico de composición ---
+    st.subheader("📊 Distribución de Ingredientes")
+    st.bar_chart(ingredientes_df.set_index('Materia Prima')['% Composición'])
     
-    df_calculo = df_formulacion.copy()
-    df_calculo['Gramos necesarios'] = df_calculo['Gramos'] * factor
+    # --- Calculadora de producción ---
+    st.subheader("🧮 Escalar Receta")
+    unidades_deseadas = st.number_input(
+        "Unidades a producir:",
+        min_value=1,
+        value=int(metadata["Cantidad de Cachitos"])
+    )
     
-    st.write(f"### 📝 Ingredientes para {unidades_deseadas} unidades")
+    factor = unidades_deseadas / metadata["Cantidad de Cachitos"]
+    ingredientes_df['Gramos necesarios'] = ingredientes_df['GRAMOS'] * factor
+    
     st.dataframe(
-        df_calculo[['Materia Prima', 'Gramos necesarios']],
+        ingredientes_df[['Materia Prima', 'Gramos necesarios']],
         hide_index=True
     )
 
@@ -110,20 +130,12 @@ st.sidebar.markdown("---")
 if st.sidebar.button("💾 Exportar esta receta"):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df_formulacion.to_excel(writer, sheet_name=selected_product, index=False)
+        recipe_df.to_excel(writer, sheet_name=selected_recipe, index=False)
     
     st.sidebar.download_button(
-        label="Descargar Excel",
+        label="Descargar como Excel",
         data=output.getvalue(),
-        file_name=f"receta_{selected_product}.xlsx",
+        file_name=f"receta_{selected_recipe}.xlsx",
         mime="application/vnd.ms-excel"
     )
 
-# --- Instrucciones ---
-st.sidebar.markdown("""
-### 📌 Instrucciones:
-1. Sube tu archivo Excel con el formato:
-   - Columnas: `Nombre Producto`, `Gramos por cachito`, `Cantidad de Cachitos`, `Materia Prima`, `GRAMOS`
-2. Los productos se agruparán automáticamente
-3. Selecciona un producto para ver su formulación
-""")
