@@ -87,6 +87,6 @@ st.sidebar.markdown("""
    - `Materia Prima` (lista de ingredientes)
    - `Gramos` (lista de pesos)
 2. Reemplaza `load_recipes()` con:
-```python
+```python""")
 def load_recipes():
     return pd.read_excel("tus_recetas.xlsx")
