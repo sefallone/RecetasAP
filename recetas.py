@@ -84,9 +84,9 @@ else:
     # Columnas de especificaciones
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Peso por unidad (g)", metadata["Gramos por cachito"])
+        st.metric("Peso por unidad (g)", metadata["Gramos por Producto"])
     with col2:
-        st.metric("Unidades por lote", metadata["Cantidad de Cachitos"])
+        st.metric("Unidades por lote", metadata["Cantidad"])
     
     # --- Tabla de ingredientes ---
     st.subheader("🧾 Formulación")
@@ -117,7 +117,7 @@ else:
         value=int(metadata["Cantidad de Cachitos"])
     )
     
-    factor = unidades_deseadas / metadata["Cantidad de Cachitos"]
+    factor = unidades_deseadas / metadata["Cantidad"]
     ingredientes_df['Gramos necesarios'] = ingredientes_df['GRAMOS'] * factor
     
     st.dataframe(
