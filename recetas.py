@@ -65,13 +65,13 @@ if recipe_df is None:
 st.header(f"📋 {selected_recipe}")
 
 # Verificamos si el DataFrame tiene el formato esperado
-if not {'Nombre Producto', 'Gramos por cachito', 'Cantidad de Cachitos', 'Materia Prima', 'GRAMOS'}.issubset(recipe_df.columns):
+if not {'Nombre Producto', 'Gramos por Producto', 'Cantidad de producto', 'Materia Prima', 'GRAMOS'}.issubset(recipe_df.columns):
     st.warning("""
     ⚠️ El formato de la hoja no coincide con lo esperado.
     Asegúrate de que tenga estas columnas:
     - Nombre Producto
-    - Gramos por cachito
-    - Cantidad de Cachitos
+    - Gramos por Producto
+    - Cantidad de Producto
     - Materia Prima
     - GRAMOS
     """)
