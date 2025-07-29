@@ -15,7 +15,7 @@ st.set_page_config(
 st.title("📚 Recetas Arte París")
 
 # --- URL del archivo Excel en GitHub (formato RAW) ---
-GITHUB_EXCEL_URL = "https://github.com/sefallone/RecetasAP/Recetario_AP_app.xlsx"
+GITHUB_EXCEL_URL = "https://github.com/sefallone/RecetasAP/"
 
 # --- Descargar el archivo desde GitHub ---
 @st.cache_data
