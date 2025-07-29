@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 import os
+import requests
 
 # Configuración de la página
 st.set_page_config(
@@ -13,51 +14,39 @@ st.set_page_config(
 # Título principal
 st.title("📚 Recetas Arte París")
 
-# --- Ruta del archivo Excel (cambia esto por tu ruta) ---
-EXCEL_PATH = "libro_recetas.xlsx"  # Asegúrate de que el archivo esté en la misma carpeta que tu script
+# --- URL del archivo Excel en GitHub (formato RAW) ---
+GITHUB_EXCEL_URL = "https://github.com/sefallone/RecetasAP/Recetario AP app.xlsx"
 
-# Verificar si el archivo existe
-if not os.path.exists(EXCEL_PATH):
-    st.error(f"❌ No se encontró el archivo: {EXCEL_PATH}")
+# --- Descargar el archivo desde GitHub ---
+@st.cache_data
+def download_excel_from_github(url):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Verifica errores HTTP
+        return BytesIO(response.content)  # Convierte a BytesIO para pandas
+    except Exception as e:
+        st.error(f"❌ Error al descargar el archivo: {str(e)}")
+        return None
+
+excel_file = download_excel_from_github(GITHUB_EXCEL_URL)
+
+if excel_file is None:
     st.stop()
 
 # --- Obtener nombres de hojas (recetas) ---
 @st.cache_data
-def get_recipe_names(file_path):
+def get_recipe_names(file):
     try:
-        xls = pd.ExcelFile(file_path)
+        xls = pd.ExcelFile(file)
         return xls.sheet_names
     except Exception as e:
         st.error(f"Error al leer el archivo: {str(e)}")
         return []
 
-recipe_names = get_recipe_names(EXCEL_PATH)
+recipe_names = get_recipe_names(excel_file)
 
 if not recipe_names:
     st.error("El archivo no contiene hojas válidas")
-    st.stop()
-
-# --- Sidebar: Selección de receta ---
-st.sidebar.title("📑 Índice de Recetas")
-selected_recipe = st.sidebar.selectbox(
-    "Selecciona una receta:",
-    options=recipe_names
-)
-
-# --- Cargar la receta seleccionada ---
-@st.cache_data
-def load_recipe(file_path, sheet_name):
-    try:
-        df = pd.read_excel(file_path, sheet_name=sheet_name)
-        df = df.dropna(how='all')  # Limpieza básica
-        return df
-    except Exception as e:
-        st.error(f"Error al cargar la hoja '{sheet_name}': {str(e)}")
-        return None
-
-recipe_df = load_recipe(EXCEL_PATH, selected_recipe)
-
-if recipe_df is None:
     st.stop()
 
 # --- Mostrar la receta ---
