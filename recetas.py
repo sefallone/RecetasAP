@@ -4,13 +4,13 @@ from io import BytesIO
 
 # Configuración de la página
 st.set_page_config(
-    page_title="📚 Libro de Recetas por Hojas",
+    page_title="📚 RECETAS ARTE PARÍS",
     page_icon="🍞",
     layout="wide"
 )
 
 # Título principal
-st.title("📚 Libro de Recetas Industriales")
+st.title("📚 Recetas Arte París")
 
 # --- Cargar archivo Excel ---
 uploaded_file = st.file_uploader("Sube tu libro de recetas (Excel)", type=["xlsx"])
