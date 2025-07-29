@@ -12,59 +12,60 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- Sistema de Autenticación ---
-# Sistema de autenticación mejorado
-def check_password():
-    """Verificación de credenciales con hash SHA-256"""
+# --- Sistema de Autenticación Multi-Usuario ---
+def check_multi_user_auth():
+    """Sistema de autenticación para múltiples usuarios"""
     
-    # Mostrar advertencia si no hay secrets configurados
-    if "password" not in st.secrets:
-        st.error("⚠️ Error de configuración: No se encontró contraseña en secrets.toml")
-        st.info("Por favor configura el archivo .streamlit/secrets.toml")
-        return False
+    # Cargar credenciales válidas desde secrets.toml
+    VALID_USERS = st.secrets.get("users", {})
     
-    def password_entered():
-        # Convertir ambas contraseñas a hash para comparación segura
-        input_hash = hashlib.sha256(st.session_state["password"].encode()).hexdigest()
-        correct_hash = hashlib.sha256(st.secrets["password"].encode()).hexdigest()
+    def authenticate():
+        username = st.session_state.get("auth_username", "")
+        password_attempt = st.session_state.get("auth_password", "")
         
-        if input_hash == correct_hash:
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Limpiar contraseña de memoria
-        else:
-            st.session_state["password_correct"] = False
-            time.sleep(1)  # Retraso para prevenir ataques de fuerza bruta
+        if username in VALID_USERS:
+            # Comparación segura con hash SHA-256
+            input_hash = hashlib.sha256(password_attempt.encode()).hexdigest()
+            correct_hash = hashlib.sha256(VALID_USERS[username].encode()).hexdigest()
+            
+            if input_hash == correct_hash:
+                st.session_state["authenticated"] = True
+                st.session_state["current_user"] = username
+                del st.session_state["auth_password"]  # Eliminar contraseña de memoria
+                return True
+        
+        st.session_state["authenticated"] = False
+        time.sleep(1)  # Pequeño delay para seguridad
+        return False
 
-    # Mostrar input de contraseña
-    if "password_correct" not in st.session_state:
-        st.text_input(
-            "Contraseña de acceso",
-            type="password",
-            on_change=password_entered,
-            key="password",
-            help="Contacta al administrador si no conoces la contraseña"
-        )
+    # Mostrar formulario de login si no está autenticado
+    if not st.session_state.get("authenticated", False):
+        with st.form("auth_form"):
+            st.text_input("Usuario", key="auth_username")
+            st.text_input("Contraseña", type="password", key="auth_password")
+            
+            if st.form_submit_button("Iniciar sesión"):
+                if authenticate():
+                    st.rerun()
+                else:
+                    st.error("Credenciales incorrectas")
         return False
     
-    elif not st.session_state["password_correct"]:
-        st.text_input(
-            "Contraseña de acceso",
-            type="password",
-            on_change=password_entered,
-            key="password",
-            help="Intenta nuevamente o contacta al administrador"
-        )
-        st.error("Acceso denegado. Contraseña incorrecta.")
-        return False
+    # Mostrar interfaz de usuario autenticado
+    st.sidebar.success(f"✅ Sesión iniciada como: {st.session_state.current_user}")
+    if st.sidebar.button("🔒 Cerrar sesión"):
+        st.session_state.clear()
+        st.rerun()
     
-    return True  # Autenticación exitosa
-# Verificar autenticación antes de mostrar la app
-if not check_password():
-    st.stop()  # No continuar si no está autenticado
+    return True
 
-# --- Título principal (solo visible si está autenticado) ---
+# Verificar autenticación antes de continuar
+if not check_multi_user_auth():
+    st.stop()
+
+# --- Título principal (visible solo para autenticados) ---
 st.title("📚 Recetas Arte París")
-st.write(f"Bienvenido, {st.secrets.get('user', 'Usuario')}")
+st.write(f"Bienvenido/a, {st.session_state.current_user}")
 
 # --- URL del archivo Excel en GitHub (formato RAW) ---
 GITHUB_EXCEL_URL = "https://raw.githubusercontent.com/sefallone/RecetasAP/main/Recetario_AP_app.xlsx"
