@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
+import os
 
 # Configuración de la página
 st.set_page_config(
@@ -12,24 +13,25 @@ st.set_page_config(
 # Título principal
 st.title("📚 Recetas Arte París")
 
-# --- Cargar archivo Excel ---
-uploaded_file = st.file_uploader("Sube tu libro de recetas (Excel)", type=["xlsx"])
+# --- Ruta del archivo Excel (cambia esto por tu ruta) ---
+EXCEL_PATH = "libro_recetas.xlsx"  # Asegúrate de que el archivo esté en la misma carpeta que tu script
 
-if not uploaded_file:
-    st.info("Por favor, sube tu archivo Excel donde cada hoja es una receta")
+# Verificar si el archivo existe
+if not os.path.exists(EXCEL_PATH):
+    st.error(f"❌ No se encontró el archivo: {EXCEL_PATH}")
     st.stop()
 
 # --- Obtener nombres de hojas (recetas) ---
 @st.cache_data
-def get_recipe_names(file):
+def get_recipe_names(file_path):
     try:
-        xls = pd.ExcelFile(file)
+        xls = pd.ExcelFile(file_path)
         return xls.sheet_names
     except Exception as e:
         st.error(f"Error al leer el archivo: {str(e)}")
         return []
 
-recipe_names = get_recipe_names(uploaded_file)
+recipe_names = get_recipe_names(EXCEL_PATH)
 
 if not recipe_names:
     st.error("El archivo no contiene hojas válidas")
@@ -44,19 +46,16 @@ selected_recipe = st.sidebar.selectbox(
 
 # --- Cargar la receta seleccionada ---
 @st.cache_data
-def load_recipe(file, sheet_name):
+def load_recipe(file_path, sheet_name):
     try:
-        df = pd.read_excel(file, sheet_name=sheet_name)
-        
-        # Limpieza básica (eliminar filas totalmente vacías)
-        df = df.dropna(how='all')
-        
+        df = pd.read_excel(file_path, sheet_name=sheet_name)
+        df = df.dropna(how='all')  # Limpieza básica
         return df
     except Exception as e:
         st.error(f"Error al cargar la hoja '{sheet_name}': {str(e)}")
         return None
 
-recipe_df = load_recipe(uploaded_file, selected_recipe)
+recipe_df = load_recipe(EXCEL_PATH, selected_recipe)
 
 if recipe_df is None:
     st.stop()
