@@ -13,25 +13,37 @@ st.set_page_config(
 )
 
 # --- Sistema de Autenticación Multi-Usuario ---
+import streamlit as st
+import hashlib
+import time
+
 def check_multi_user_auth():
-    """Sistema de autenticación para múltiples usuarios"""
+    """
+    Sistema de autenticación multi-usuario que verifica credenciales contra secrets.toml
+    Devuelve True si la autenticación es exitosa, False en caso contrario
+    """
     
-    # Cargar credenciales válidas desde secrets.toml
-    VALID_USERS = st.secrets.get("users", {})
+    # Cargar usuarios válidos desde secrets.toml
+    try:
+        VALID_USERS = st.secrets["users"]
+    except (KeyError, AttributeError):
+        st.error("Error de configuración: No se encontraron usuarios en secrets.toml")
+        st.stop()
     
+    # Función para verificar credenciales
     def authenticate():
-        username = st.session_state.get("auth_username", "")
+        username = st.session_state.get("auth_username", "").strip()
         password_attempt = st.session_state.get("auth_password", "")
         
         if username in VALID_USERS:
             # Comparación segura con hash SHA-256
             input_hash = hashlib.sha256(password_attempt.encode()).hexdigest()
-            correct_hash = hashlib.sha256(VALID_USERS[username].encode()).hexdigest()
+            stored_hash = hashlib.sha256(VALID_USERS[username].encode()).hexdigest()
             
-            if input_hash == correct_hash:
+            if input_hash == stored_hash:
                 st.session_state["authenticated"] = True
                 st.session_state["current_user"] = username
-                del st.session_state["auth_password"]  # Eliminar contraseña de memoria
+                del st.session_state["auth_password"]  # Limpiar contraseña de memoria
                 return True
         
         st.session_state["authenticated"] = False
@@ -40,20 +52,36 @@ def check_multi_user_auth():
 
     # Mostrar formulario de login si no está autenticado
     if not st.session_state.get("authenticated", False):
-        with st.form("auth_form"):
-            st.text_input("Usuario", key="auth_username")
-            st.text_input("Contraseña", type="password", key="auth_password")
+        st.subheader("Acceso al Sistema de Recetas")
+        
+        with st.form("auth_form", clear_on_submit=True):
+            st.text_input("Usuario", key="auth_username", help="Ingrese su nombre de usuario")
+            st.text_input("Contraseña", type="password", key="auth_password", help="Ingrese su contraseña")
             
-            if st.form_submit_button("Iniciar sesión"):
+            if st.form_submit_button("Iniciar Sesión"):
                 if authenticate():
                     st.rerun()
                 else:
-                    st.error("Credenciales incorrectas")
+                    st.error("Credenciales incorrectas o usuario no válido")
+        
+        # Mensaje para usuarios nuevos
+        st.markdown("""
+        <div style="margin-top: 2rem; padding: 1rem; background-color: #f8f9fa; border-radius: 0.5rem;">
+            <small>¿Problemas para acceder? Contacte al administrador del sistema.</small>
+        </div>
+        """, unsafe_allow_html=True)
+        
         return False
     
     # Mostrar interfaz de usuario autenticado
-    st.sidebar.success(f"✅ Sesión iniciada como: {st.session_state.current_user}")
-    if st.sidebar.button("🔒 Cerrar sesión"):
+    st.sidebar.markdown(f"""
+    <div style="margin-bottom: 1rem;">
+        <small>Sesión iniciada como:</small><br>
+        <strong>{st.session_state.current_user}</strong>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.sidebar.button("🔒 Cerrar sesión", type="primary"):
         st.session_state.clear()
         st.rerun()
     
