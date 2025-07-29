@@ -18,17 +18,17 @@ st.title("📚 Recetas Arte París")
 GITHUB_EXCEL_URL = "https://raw.githubusercontent.com/sefallone/RecetasAP/main/Recetario_AP_app.xlsx"
 
 # --- Descargar el archivo desde GitHub ---
-@st.cache_data
-def download_excel_from_github(url):
+@st.cache_data(ttl=3600)  # Cache por 1 hora
+def get_excel_from_github():
     try:
-        response = requests.get(url)
+        response = requests.get(GITHUB_EXCEL_URL)
         response.raise_for_status()  # Verifica errores HTTP
         return BytesIO(response.content)  # Convierte a BytesIO para pandas
     except Exception as e:
         st.error(f"❌ Error al descargar el archivo: {str(e)}")
         return None
 
-excel_file = download_excel_from_github(GITHUB_EXCEL_URL)
+excel_file = get_excel_from_github()
 
 if excel_file is None:
     st.stop()
@@ -49,11 +49,35 @@ if not recipe_names:
     st.error("El archivo no contiene hojas válidas")
     st.stop()
 
-# --- Mostrar la receta ---
-st.header(f"📋 {recipe_names}")
+# --- Sidebar: Selección de receta ---
+st.sidebar.title("📑 Índice de Recetas")
+selected_recipe = st.sidebar.selectbox(
+    "Selecciona una receta:",
+    options=recipe_names
+)
 
-# Verificamos si el DataFrame tiene el formato esperado
-if not {'Nombre Producto', 'Gramos por Producto', 'Cantidad', 'Materia Prima', 'GRAMOS'}.issubset(recipe_df.columns):
+# --- Cargar la receta seleccionada ---
+@st.cache_data
+def load_recipe(file, sheet_name):
+    try:
+        df = pd.read_excel(file, sheet_name=sheet_name)
+        df = df.dropna(how='all')  # Limpieza básica
+        return df
+    except Exception as e:
+        st.error(f"Error al cargar la hoja '{sheet_name}': {str(e)}")
+        return None
+
+recipe_df = load_recipe(excel_file, selected_recipe)
+
+if recipe_df is None:
+    st.stop()
+
+# --- Mostrar la receta ---
+st.header(f"📋 {selected_recipe}")
+
+# Verificación del formato
+required_columns = {'Nombre Producto', 'Gramos por Producto', 'Cantidad', 'Materia Prima', 'GRAMOS'}
+if not required_columns.issubset(recipe_df.columns):
     st.warning("""
     ⚠️ El formato de la hoja no coincide con lo esperado.
     Asegúrate de que tenga estas columnas:
@@ -66,10 +90,10 @@ if not {'Nombre Producto', 'Gramos por Producto', 'Cantidad', 'Materia Prima', '
     st.write("Vista previa de los datos cargados:")
     st.dataframe(recipe_df)
 else:
-    # Extraemos metadatos (primera fila válida)
+    # Extraer metadatos
     metadata = recipe_df.iloc[0]
     
-    # Columnas de especificaciones
+    # Mostrar métricas
     col1, col2 = st.columns(2)
     with col1:
         st.metric("Peso por unidad (g)", metadata["Gramos por Producto"])
@@ -79,14 +103,10 @@ else:
     # --- Tabla de ingredientes ---
     st.subheader("🧾 Formulación")
     
-    # Filtramos solo las filas con ingredientes (omitimos metadatos si existen)
     ingredientes_df = recipe_df[['Materia Prima', 'GRAMOS']].dropna()
-    
-    # Calculamos porcentajes
     total_gramos = ingredientes_df['GRAMOS'].sum()
     ingredientes_df['% Composición'] = (ingredientes_df['GRAMOS'] / total_gramos) * 100
     
-    # Mostramos tabla
     st.dataframe(
         ingredientes_df.style.format({'% Composición': '{:.2f}%'}),
         use_container_width=True,
@@ -127,3 +147,6 @@ if st.sidebar.button("💾 Exportar esta receta"):
         mime="application/vnd.ms-excel"
     )
 
+# Créditos
+st.sidebar.markdown("---")
+st.sidebar.caption("© Arte París - Sistema de Gestión de Recetas")
