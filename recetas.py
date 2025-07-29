@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
-import os
 import requests
+import hashlib
+import time
 
 # Configuración de la página
 st.set_page_config(
@@ -11,8 +12,49 @@ st.set_page_config(
     layout="wide"
 )
 
-# Título principal
+# --- Sistema de Autenticación ---
+def check_password():
+    """Verifica si el usuario está autenticado"""
+    
+    def password_entered():
+        # Verifica la contraseña
+        if st.session_state["password"] == st.secrets["password"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # No almacenar la contraseña
+        else:
+            st.session_state["password_correct"] = False
+
+    # Mostrar formulario de login si no está autenticado
+    if "password_correct" not in st.session_state:
+        st.text_input(
+            "Contraseña", 
+            type="password", 
+            on_change=password_entered, 
+            key="password"
+        )
+        return False
+    
+    elif not st.session_state["password_correct"]:
+        st.text_input(
+            "Contraseña", 
+            type="password", 
+            on_change=password_entered, 
+            key="password"
+        )
+        st.error("😕 Contraseña incorrecta")
+        return False
+    
+    else:
+        # Usuario autenticado
+        return True
+
+# Verificar autenticación antes de mostrar la app
+if not check_password():
+    st.stop()  # No continuar si no está autenticado
+
+# --- Título principal (solo visible si está autenticado) ---
 st.title("📚 Recetas Arte París")
+st.write(f"Bienvenido, {st.secrets.get('user', 'Usuario')}")
 
 # --- URL del archivo Excel en GitHub (formato RAW) ---
 GITHUB_EXCEL_URL = "https://raw.githubusercontent.com/sefallone/RecetasAP/main/Recetario_AP_app.xlsx"
