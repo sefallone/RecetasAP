@@ -13,41 +13,51 @@ st.set_page_config(
 )
 
 # --- Sistema de Autenticación ---
+# Sistema de autenticación mejorado
 def check_password():
-    """Verifica si el usuario está autenticado"""
+    """Verificación de credenciales con hash SHA-256"""
+    
+    # Mostrar advertencia si no hay secrets configurados
+    if "password" not in st.secrets:
+        st.error("⚠️ Error de configuración: No se encontró contraseña en secrets.toml")
+        st.info("Por favor configura el archivo .streamlit/secrets.toml")
+        return False
     
     def password_entered():
-        # Verifica la contraseña
-        if st.session_state["password"] == st.secrets["password"]:
+        # Convertir ambas contraseñas a hash para comparación segura
+        input_hash = hashlib.sha256(st.session_state["password"].encode()).hexdigest()
+        correct_hash = hashlib.sha256(st.secrets["password"].encode()).hexdigest()
+        
+        if input_hash == correct_hash:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # No almacenar la contraseña
+            del st.session_state["password"]  # Limpiar contraseña de memoria
         else:
             st.session_state["password_correct"] = False
+            time.sleep(1)  # Retraso para prevenir ataques de fuerza bruta
 
-    # Mostrar formulario de login si no está autenticado
+    # Mostrar input de contraseña
     if "password_correct" not in st.session_state:
         st.text_input(
-            "Contraseña", 
-            type="password", 
-            on_change=password_entered, 
-            key="password"
+            "Contraseña de acceso",
+            type="password",
+            on_change=password_entered,
+            key="password",
+            help="Contacta al administrador si no conoces la contraseña"
         )
         return False
     
     elif not st.session_state["password_correct"]:
         st.text_input(
-            "Contraseña", 
-            type="password", 
-            on_change=password_entered, 
-            key="password"
+            "Contraseña de acceso",
+            type="password",
+            on_change=password_entered,
+            key="password",
+            help="Intenta nuevamente o contacta al administrador"
         )
-        st.error("😕 Contraseña incorrecta")
+        st.error("Acceso denegado. Contraseña incorrecta.")
         return False
     
-    else:
-        # Usuario autenticado
-        return True
-
+    return True  # Autenticación exitosa
 # Verificar autenticación antes de mostrar la app
 if not check_password():
     st.stop()  # No continuar si no está autenticado
