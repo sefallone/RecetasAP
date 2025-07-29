@@ -50,7 +50,7 @@ if not recipe_names:
     st.stop()
 
 # --- Mostrar la receta ---
-st.header(f"📋 {selected_recipe}")
+st.header(f"📋 {recipe_names}")
 
 # Verificamos si el DataFrame tiene el formato esperado
 if not {'Nombre Producto', 'Gramos por Producto', 'Cantidad', 'Materia Prima', 'GRAMOS'}.issubset(recipe_df.columns):
