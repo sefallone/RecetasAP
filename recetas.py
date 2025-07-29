@@ -7,76 +7,66 @@ import time
 
 # Configuración de la página
 st.set_page_config(
-    page_title="📚 RECETAS ARTE PARÍS",
+    page_title="📚 Sistema de Recetas Arte París",
     page_icon="🍞",
     layout="wide"
 )
 
-# --- Sistema de Autenticación Multi-Usuario ---
-import streamlit as st
-import hashlib
-import time
-
+# --- Sistema de Autenticación Mejorado ---
 def check_multi_user_auth():
-    """
-    Sistema de autenticación multi-usuario que verifica credenciales contra secrets.toml
-    Devuelve True si la autenticación es exitosa, False en caso contrario
-    """
+    """Verifica las credenciales del usuario contra secrets.toml"""
     
-    # Cargar usuarios válidos desde secrets.toml
+    # Cargar usuarios válidos
     try:
         VALID_USERS = st.secrets["users"]
     except (KeyError, AttributeError):
         st.error("Error de configuración: No se encontraron usuarios en secrets.toml")
         st.stop()
     
-    # Función para verificar credenciales
     def authenticate():
+        """Compara credenciales usando hash seguro"""
         username = st.session_state.get("auth_username", "").strip()
         password_attempt = st.session_state.get("auth_password", "")
         
         if username in VALID_USERS:
-            # Comparación segura con hash SHA-256
             input_hash = hashlib.sha256(password_attempt.encode()).hexdigest()
             stored_hash = hashlib.sha256(VALID_USERS[username].encode()).hexdigest()
             
             if input_hash == stored_hash:
                 st.session_state["authenticated"] = True
                 st.session_state["current_user"] = username
-                del st.session_state["auth_password"]  # Limpiar contraseña de memoria
+                del st.session_state["auth_password"]
                 return True
         
-        st.session_state["authenticated"] = False
-        time.sleep(1)  # Pequeño delay para seguridad
+        time.sleep(1)  # Prevención básica contra fuerza bruta
         return False
 
     # Mostrar formulario de login si no está autenticado
     if not st.session_state.get("authenticated", False):
-        st.subheader("Acceso al Sistema de Recetas")
+        st.title("Acceso al Sistema")
         
         with st.form("auth_form", clear_on_submit=True):
-            st.text_input("Usuario", key="auth_username", help="Ingrese su nombre de usuario")
-            st.text_input("Contraseña", type="password", key="auth_password", help="Ingrese su contraseña")
+            st.text_input("Usuario", key="auth_username")
+            st.text_input("Contraseña", type="password", key="auth_password")
             
-            if st.form_submit_button("Iniciar Sesión"):
+            if st.form_submit_button("Ingresar"):
                 if authenticate():
                     st.rerun()
                 else:
-                    st.error("Credenciales incorrectas o usuario no válido")
+                    st.error("Credenciales incorrectas")
         
-        # Mensaje para usuarios nuevos
         st.markdown("""
-        <div style="margin-top: 2rem; padding: 1rem; background-color: #f8f9fa; border-radius: 0.5rem;">
-            <small>¿Problemas para acceder? Contacte al administrador del sistema.</small>
+        <div style="margin-top:2em; padding:1em; background:#f8f9fa; border-radius:0.5em;">
+            <small>¿Problemas para acceder? Contacte al administrador</small>
         </div>
         """, unsafe_allow_html=True)
         
         return False
     
-    # Mostrar interfaz de usuario autenticado
+    # Barra lateral para usuario autenticado
     st.sidebar.markdown(f"""
-    <div style="margin-bottom: 1rem;">
-        <small>Sesión iniciada como:</small><br>
+    <div style="margin-bottom:1em;">
+        <small>Usuario:</small><br>
         <strong>{st.session_state.current_user}</strong>
     </div>
     """, unsafe_allow_html=True)
@@ -87,9 +77,10 @@ def check_multi_user_auth():
     
     return True
 
-# Verificar autenticación antes de continuar
+# --- Verificar autenticación antes de continuar ---
 if not check_multi_user_auth():
     st.stop()
+
 
 # --- Título principal (visible solo para autenticados) ---
 st.title("📚 Recetas Arte París")
