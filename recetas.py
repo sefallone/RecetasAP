@@ -29,6 +29,13 @@ def load_css():
         border-radius: 0.5rem;
         border-left: 4px solid #1f77b4;
     }
+    .metric-card h3 {
+        color: #003366 !important;
+        margin-bottom: 0;
+    }
+    .metric-card br {
+        margin-bottom: 0.5rem;
+    }
     .recipe-card {
         padding: 1rem;
         border-radius: 0.5rem;
@@ -38,6 +45,13 @@ def load_css():
     .favorite-btn {
         background-color: #ffd700 !important;
         color: black !important;
+    }
+    .production-card {
+        background-color: #e8f5e8;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #28a745;
+        margin-bottom: 1rem;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -70,6 +84,9 @@ def check_multi_user_auth():
                 # Inicializar favoritos si no existen
                 if "favorites" not in st.session_state:
                     st.session_state.favorites = []
+                # Inicializar plan de producción si no existe
+                if "production_plan" not in st.session_state:
+                    st.session_state.production_plan = {}
                 del st.session_state["auth_password"]
                 return True
         
@@ -151,6 +168,29 @@ def load_recipe(file, sheet_name):
     except Exception as e:
         st.error(f"❌ Error al cargar la hoja '{sheet_name}': {str(e)}")
         return None
+
+# --- Función para calcular ingredientes de producción ---
+def calculate_production_requirements(recipe_name, quantity, recipe_df):
+    """Calcula los ingredientes necesarios para una cantidad específica de producto"""
+    if 'GRAMOS' not in recipe_df.columns or 'Materia Prima' not in recipe_df.columns:
+        return None
+    
+    ingredientes_df = recipe_df[['Materia Prima', 'GRAMOS']].dropna()
+    if ingredientes_df.empty:
+        return None
+    
+    # Obtener la cantidad base del lote
+    try:
+        base_quantity = float(recipe_df.iloc[0]['Cantidad'])
+    except:
+        base_quantity = 1
+    
+    factor = quantity / base_quantity
+    ingredientes_df['Cantidad Necesaria'] = ingredientes_df['GRAMOS'] * factor
+    ingredientes_df['Receta'] = recipe_name
+    ingredientes_df['Unidades Solicitadas'] = quantity
+    
+    return ingredientes_df[['Materia Prima', 'Cantidad Necesaria', 'Receta', 'Unidades Solicitadas']]
 
 # --- Descargar y procesar archivo ---
 with st.spinner("🔄 Cargando sistema de recetas..."):
@@ -278,7 +318,7 @@ else:
         st.markdown(f'<div class="metric-card">Peso total del lote<br><h3>{total_gramos:.0f} g</h3></div>', unsafe_allow_html=True)
     
     # Crear pestañas para organizar la información
-    tab1, tab2, tab3 = st.tabs(["🧾 Formulación", "📊 Composición", "🧮 Calculadora"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🧾 Formulación", "📊 Composición", "🧮 Calculadora", "📦 Plan de Producción"])
     
     with tab1:
         # Tabla de ingredientes
@@ -345,8 +385,89 @@ else:
         # Mostrar el total de ingredientes necesarios
         total_gramos_necesarios = ingredientes_df['Gramos necesarios'].sum()
         st.metric("Total de ingredientes necesarios", f"{total_gramos_necesarios:.2f} g")
+    
+    with tab4:
+        # Nuevo sistema de planificación de producción
+        st.subheader("📦 Planificador de Producción")
+        
+        st.markdown("""
+        <div class="production-card">
+        <strong>Agregar al plan de producción:</strong><br>
+        Selecciona la cantidad de unidades que deseas producir y agrégalas a tu plan.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            production_quantity = st.number_input(
+                "Cantidad a producir:",
+                min_value=1,
+                value=int(metadata["Cantidad"]),
+                key="prod_quantity"
+            )
+        with col2:
+            st.write("")  # Espaciador
+            st.write("")  # Espaciador
+            if st.button("➕ Agregar al Plan", use_container_width=True):
+                # Calcular requerimientos
+                requirements = calculate_production_requirements(selected_recipe, production_quantity, recipe_df)
+                
+                if requirements is not None:
+                    # Agregar al plan de producción
+                    if selected_recipe not in st.session_state.production_plan:
+                        st.session_state.production_plan[selected_recipe] = []
+                    
+                    st.session_state.production_plan[selected_recipe].append({
+                        'quantity': production_quantity,
+                        'requirements': requirements
+                    })
+                    st.success(f"✅ {production_quantity} unidades de {selected_recipe} agregadas al plan")
+                else:
+                    st.error("❌ No se pudieron calcular los requerimientos de producción")
+        
+        # Mostrar plan de producción actual
+        st.subheader("📋 Plan de Producción Actual")
+        
+        if not st.session_state.production_plan:
+            st.info("ℹ️ No hay productos en tu plan de producción. Agrega algunos usando el formulario arriba.")
+        else:
+            all_requirements = []
+            
+            for recipe_name, productions in st.session_state.production_plan.items():
+                for production in productions:
+                    st.write(f"**{recipe_name}**: {production['quantity']} unidades")
+                    all_requirements.append(production['requirements'])
+            
+            # Combinar todos los requerimientos
+            if all_requirements:
+                combined_df = pd.concat(all_requirements, ignore_index=True)
+                
+                # Agrupar por materia prima y sumar cantidades
+                summary_df = combined_df.groupby('Materia Prima')['Cantidad Necesaria'].sum().reset_index()
+                summary_df = summary_df.sort_values('Cantidad Necesaria', ascending=False)
+                
+                st.subheader("📊 Resumen de Materias Primas Requeridas")
+                st.dataframe(
+                    summary_df.style.format({'Cantidad Necesaria': '{:.2f} g'}),
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # Botón para exportar el plan
+                st.download_button(
+                    label="📥 Exportar Plan de Producción",
+                    data=summary_df.to_csv(index=False),
+                    file_name="plan_produccion.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+                
+                # Botón para limpiar plan
+                if st.button("🗑️ Limpiar Plan de Producción", use_container_width=True):
+                    st.session_state.production_plan = {}
+                    st.rerun()
 
-# --- Exportar receta ---
+# --- Exportar receta individual ---
 st.sidebar.markdown("---")
 st.sidebar.subheader("💾 Exportar Receta")
 
