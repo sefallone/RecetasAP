@@ -301,19 +301,17 @@ else:
         # Gráfico de barras
         st.bar_chart(ingredientes_df.set_index('Materia Prima')['% Composición'])
         
-        # Gráfico de torta
+        # Tabla de porcentajes como alternativa al gráfico de torta
         st.subheader("🥧 Porcentajes en el Total")
-        st.plotly_chart({
-            "data": [{
-                "values": ingredientes_df['GRAMOS'],
-                "labels": ingredientes_df['Materia Prima'],
-                "type": "pie",
-                "hole": 0.4,
-            }],
-            "layout": {
-                "height": 400,
-            }
-        }, use_container_width=True)
+        
+        # Ordenar por porcentaje descendente
+        porcentajes_df = ingredientes_df[['Materia Prima', '% Composición']].sort_values('% Composición', ascending=False)
+        
+        # Mostrar tabla con barras de progreso
+        for _, row in porcentajes_df.iterrows():
+            porcentaje = row['% Composición']
+            st.write(f"**{row['Materia Prima']}**: {porcentaje:.1f}%")
+            st.progress(min(porcentaje / 100, 1.0))
     
     with tab3:
         # Calculadora de producción
@@ -357,8 +355,9 @@ def get_table_download_link(df, filename):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, sheet_name=selected_recipe, index=False)
-    b64 = base64.b64encode(output.getvalue()).decode()
-    return f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="{filename}.xlsx">Descargar como Excel</a>'
+    processed_data = output.getvalue()
+    b64 = base64.b64encode(processed_data).decode()
+    return f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="{filename}.xlsx">📥 Descargar como Excel</a>'
 
 st.sidebar.markdown(get_table_download_link(recipe_df, f"receta_{selected_recipe}"), unsafe_allow_html=True)
 
